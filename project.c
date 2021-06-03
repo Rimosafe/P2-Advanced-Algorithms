@@ -260,10 +260,13 @@ void extendTree(int istring, int index){
         continue;
       }
 
+      printf("HEAD: %d\n", next->head);
+
       /*character is already on the edge*/
+      printf("comparing %c with %c\n", strings[istring]->text[next->head + s->active_length], strings[istring]->text[index]);
       if(strings[istring]->text[next->head + s->active_length] == strings[istring]->text[index]) {
-          printf("active length: %d \n", s->active_length);
-          printf("char %c is already on the edge.\n", strings[istring]->text[next->head + s->active_length]);
+          /*printf("active length: %d \n", s->active_length);*/
+          /*printf("char %c is already on the edge.\n", strings[istring]->text[next->head + s->active_length]);*/
 
         if(s->last_newnode != NULL && s->active_node != root) {
           s->last_newnode->slink = s->active_node;
@@ -279,6 +282,8 @@ void extendTree(int istring, int index){
         break;
 
       }
+
+      printf("SPLITING\n");
 
       /*split edge*/
       split = split_edge(istring, index, next);
@@ -403,8 +408,6 @@ void buildTree(){
     s->active_edge = -1;
     s->active_length = 0;
     s->remain = 0;
-
-    printOccurrences(root);
 
     while(i < strings[k]->size + 1){ /*For each char of string k*/
       extendTree(k, i);
