@@ -25,8 +25,11 @@ test5:
 test6:
 	./project < Tests/input06
 
+test7:
+	./project < Tests/input07
+
 val:
-	valgrind -v --leak-check=full ./project < Tests/input01
+	valgrind -v --leak-check=full ./project < Tests/input07
 
 vgdb:
 	valgrind --vgdb=yes --vgdb-error=0 ./project < Tests/input01
