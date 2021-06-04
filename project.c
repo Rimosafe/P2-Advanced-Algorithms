@@ -10,7 +10,7 @@ typedef struct Node Node;
 struct Node{
   int* Ti;
   int head;
-  int sdep;
+  int *sdep;
   Node *slink;
   Node **child;
   Node *hook;
@@ -37,36 +37,56 @@ struct State{
 typedef struct{
   char *text;
   int size;
-} string;
+} String;
 
 /*--------------------------------------------------------------------
 | Global variables
 ---------------------------------------------------------------------*/
-string **strings;
+String *string;
 int n_strings;
-
 int count;
+
+int *strings_sz;
+int *leafEnd;
+int *rootEnd;
+int *splitEnd;
 
 Node *root;
 State *s;
+
+
+/*--------------------------------------------------------------------
+| Function: print_strings
+| Description: Print set of strings
+---------------------------------------------------------------------*/
+void print_strings(){
+  int i;
+
+  for(i = 0; i < string->size; i++){
+      printf("%c", string->text[i]);
+  }
+  printf("\n");
+
+}
+
 
 /*--------------------------------------------------------------------
 | Function: read_string
 | Description: Read string i from input and add '\0' at the end
 ---------------------------------------------------------------------*/
 void read_string(int index){
-  int i, c, size;
+  int i, c;
 
-  i = 0;
-  size = strings[index]->size;
-  strings[index]->text = malloc((size + 1)*sizeof(char));
+  i = index;
 
   while('\n' != (c = getchar())){
-    strings[index]->text[i] = (char)c;
+    string->text[i] = (char)c;
     i++;
   }
 
-  strings[index]->text[i] = '$'; /*Terminator*/
+  string->text[i] = '$'; /*Terminator*/
+
+  print_strings();
 }
 
 
@@ -75,35 +95,35 @@ void read_string(int index){
 | Description: Read all the input file and saves the data
 ---------------------------------------------------------------------*/
 void process_input(){
-  int s_size, index;
+  int s_size, index, k;
 
   scanf("%d\n", &n_strings); /*Read number of strings*/
 
   index = 0;
-  strings = malloc(n_strings * sizeof(string*));
+  k = 0;
+
+  string = malloc(sizeof(String));
+  string->text = malloc(sizeof(char));
+  string->size = 0;
+
+  strings_sz = malloc(n_strings*sizeof(int));
 
   while(scanf("%d", &s_size) == 1){
-    strings[index] = malloc(sizeof(string));
-    strings[index]->size = s_size;
+    string->size += s_size + 1;
+    strings_sz[k] = string->size - 1;
+
+
+    string->text = realloc(string->text, string->size*sizeof(char));
+
     getchar(); /*Read whitespace character*/
-    read_string(index++);
+    read_string(index);
+
+    index += string->size;
+    k++;
   }
-}
 
-
-/*--------------------------------------------------------------------
-| Function: print_strings
-| Description: Print set of strings
----------------------------------------------------------------------*/
-void print_strings(){
-  int k, i;
-
-  for(k = 0; k < n_strings; k++){
-    for(i = 0; i < strings[k]->size + 1; i++){
-      printf("%c", strings[k]->text[i]);
-    }
-    printf("\n");
-  }
+  string->text = realloc(string->text, (string->size+1)*sizeof(char));
+  string->text[string->size] = '\0';
 }
 
 
@@ -112,13 +132,25 @@ void print_strings(){
 | Description: Free memory allocated for input
 ---------------------------------------------------------------------*/
 void free_strings(){
-  int k;
+  free(string->text);
+  free(string);
+}
 
-  for(k = 0; k < n_strings; k++){
-    free(strings[k]->text);
-    free(strings[k]);
+
+/*--------------------------------------------------------------------
+| Function: free_strings
+| Description: Free memory allocated for input
+---------------------------------------------------------------------*/
+int map_index_string(int index){
+  int i;
+
+  for(i = 0; i < n_strings; i++) {
+    if(index <= strings_sz[i]){
+      return i;
+    }
   }
-  free(strings);
+
+  return 0;
 }
 
 
@@ -126,7 +158,7 @@ void free_strings(){
 | Function:
 | Description:
 ---------------------------------------------------------------------*/
-Node *newNode(int istring, int start, int end){
+Node *newNode(int start, int *end){
   int i;
 
   Node *node = malloc(sizeof(Node));
@@ -135,15 +167,9 @@ Node *newNode(int istring, int start, int end){
 
   if(node != NULL){
 
-    node->Ti = malloc(n_strings*sizeof(int));
+    node->child = malloc(128 * sizeof(Node*));
 
-    for (i = 0; i < n_strings; i++){
-      node->Ti[i] = 0;
-    }
-
-    node->child = malloc(5 * sizeof(Node*));
-
-    for (i = 0; i < 5; i++){
+    for (i = 0; i < 128; i++){
       node->child[i] = NULL;
     }
 
@@ -151,7 +177,6 @@ Node *newNode(int istring, int start, int end){
     node->slink = root;
     node->head = start;
     node->sdep = end;
-    node->Ti[istring] = 1;
   }
 
   return node;
@@ -163,11 +188,15 @@ Node *newNode(int istring, int start, int end){
 | Description:
 ---------------------------------------------------------------------*/
 int map_char(int c){
-  if(c == 'A') return 0;
-  else if (c == 'C') return 1;
-  else if (c == 'G') return 2;
-  else if (c == 'T') return 3;
-  else return 4;
+  int i;
+
+  if(65 == c) i = 0;
+  else if (67 == c) i = 1;
+  else if (71 == c) i = 2;
+  else if (c == 84) i = 3;
+  else i = 4;
+
+  return i;
 }
 
 
@@ -175,14 +204,12 @@ int map_char(int c){
 | Function:
 | Description:
 ---------------------------------------------------------------------*/
-int descend(int istring, Node *current){
-
+int descend(Node *current){
   int length;
-
-  length = current->sdep - current->head + 1;
+  length = *current->sdep - current->head + 1;
 
   if(s->active_length >= length) {
-    s->active_edge = (int)strings[istring]->text[s->active_edge + length];
+    s->active_edge = (int)string->text[s->active_edge + length];
     s->active_length -= length;
     s->active_node = current;
     return 1;
@@ -196,26 +223,21 @@ int descend(int istring, Node *current){
 | Function:
 | Description:
 ---------------------------------------------------------------------*/
-Node *split_edge(int istring, int index, Node *current){
-  int end, i;
+Node *split_edge(int index, Node *current){
+
   Node *split;
 
-  end = current->head + s->active_length - 1;
+  splitEnd = (int*) malloc(sizeof(int));
 
-  split = newNode(istring, current->head, end);
-  s->active_node->child[map_char(s->active_edge)] = split;
+  *splitEnd = current->head + s->active_length - 1;
 
-  for(i = 0; i < n_strings; i++) {
-    if(current->Ti[i] == 1){
-      s->active_node->child[map_char(s->active_edge)]->Ti[i] = 1;
-    }
-  }
+  split = newNode(current->head, splitEnd);
+  s->active_node->child[s->active_edge] = split;
 
-  split->child[map_char((int)strings[istring]->text[index])] = newNode(istring, index, strings[istring]->size);
-  split->child[map_char((int)strings[istring]->text[index])]->Ti[istring] = 1;
+  split->child[(int)string->text[index]] = newNode(index, &leafEnd[map_index_string(index)]);
 
   current->head += s->active_length;
-  split->child[map_char(s->active_edge)] = current;
+  split->child[s->active_edge] = current;
 
   return split;
 }
@@ -226,7 +248,9 @@ Node *split_edge(int istring, int index, Node *current){
 | Function:
 | Description:
 ---------------------------------------------------------------------*/
-void extendTree(int istring, int index){
+void extendTree(int index){
+
+  leafEnd[map_index_string(index)] = index;
 
   s->remain++;
 
@@ -235,15 +259,12 @@ void extendTree(int istring, int index){
 
   while(s->remain > 0) {
 
-    printf("active edge: %c\n", s->active_edge);
-
     if(s->active_length == 0) {
-      s->active_edge = (int)strings[istring]->text[index];
+      s->active_edge = (int)string->text[index];
     }
 
-    if(s->active_node->child[map_char(s->active_edge)] == NULL){ /* There is no outgoing edge*/
-
-      s->active_node->child[map_char(s->active_edge)] = newNode(istring, index, strings[istring]->size); /*Create leaf*/
+    if(s->active_node->child[s->active_edge] == NULL){ /* There is no outgoing edge*/
+      s->active_node->child[s->active_edge] = newNode(index, &leafEnd[map_index_string(index)]); /*Create leaf*/
 
       if(s->last_newnode != NULL) {
         s->last_newnode->slink = s->active_node;
@@ -253,20 +274,15 @@ void extendTree(int istring, int index){
 
     else{ /*There is an outgoing edge*/
       Node *split;
-      Node *next = s->active_node->child[map_char(s->active_edge)];
+      Node *next;
+      next = s->active_node->child[s->active_edge];
 
-      if(descend(istring, next)) {
-        next->Ti[istring] = 1;
+      if(descend(next)) {
         continue;
       }
 
-      printf("HEAD: %d\n", next->head);
-
       /*character is already on the edge*/
-      printf("comparing %c with %c\n", strings[istring]->text[next->head + s->active_length], strings[istring]->text[index]);
-      if(strings[istring]->text[next->head + s->active_length] == strings[istring]->text[index]) {
-          /*printf("active length: %d \n", s->active_length);*/
-          /*printf("char %c is already on the edge.\n", strings[istring]->text[next->head + s->active_length]);*/
+      if(string->text[next->head + s->active_length] == string->text[index]) {
 
         if(s->last_newnode != NULL && s->active_node != root) {
           s->last_newnode->slink = s->active_node;
@@ -275,18 +291,12 @@ void extendTree(int istring, int index){
 
         s->active_length++;
 
-        /*if(index == strings[istring]->size){
-          next->Ti[istring] = 1;
-        }*/
-
         break;
 
       }
 
-      printf("SPLITING\n");
-
       /*split edge*/
-      split = split_edge(istring, index, next);
+      split = split_edge(index, next);
 
       if(s->last_newnode != NULL) {
         s->last_newnode->slink = split;
@@ -300,7 +310,7 @@ void extendTree(int istring, int index){
 
     if(s->active_node == root && s->active_length > 0) {
       s->active_length--;
-      s->active_edge = (int)strings[istring]->text[index - s->remain + 1];
+      s->active_edge = (int)string->text[index - s->remain + 1];
     }
 
     else if(s->active_node != root) {
@@ -316,13 +326,13 @@ void extendTree(int istring, int index){
 | Function:
 | Description:
 ---------------------------------------------------------------------*/
-void printPathLabel(int istring, int start, int end){
+void printPathLabel(int start, int end){
 
   int i;
-
   for(i = start; i <= end; i++) {
-    printf("%c", strings[istring]->text[i]);
+    printf("%c", string->text[i]);
   }
+  printf("\n");
 }
 
 
@@ -330,13 +340,13 @@ void printPathLabel(int istring, int start, int end){
 | Function:
 | Description:
 ---------------------------------------------------------------------*/
-/*void printTree(Node* node){
+void printTree(Node* node){
 
   int i;
 
   if(node == NULL) return;
 
-  if(node->head != -1) printPathLabel(node->Ti, node->head, node->sdep);
+  if(node->head != -1) printPathLabel(node->head, *node->sdep);
 
   for(i = 0; i < 5; i++) {
 
@@ -345,44 +355,6 @@ void printPathLabel(int istring, int start, int end){
     }
 
   }
-
-}*/
-
-
-/*--------------------------------------------------------------------
-| Function:
-| Description:
----------------------------------------------------------------------*/
-void printOccurrences(Node* node){
-
-  int i, k;
-
-  if(node == NULL) return;
-
-  if(node->head != -1){
-
-    for(k = 0; k < n_strings; k++) {
-
-      if(node->Ti[k] == 1){
-        printPathLabel(k, node->head, node->sdep);
-        break;
-      }
-    }
-
-    for(k = 0; k < n_strings; k++) {
-      printf("  %d", node->Ti[k]);
-    }
-
-    printf("\n");
-  }
-
-  for(i = 0; i < 5; i++) {
-    if(node->child[i] != NULL) {
-      /*printf("%d\n",i);*/
-      printOccurrences(node->child[i]);
-    }
-  }
-
 
 }
 
@@ -393,28 +365,53 @@ void printOccurrences(Node* node){
 ---------------------------------------------------------------------*/
 void buildTree(){
 
-  int k, i;
-  k = 0;
+  int i, k;
+  int terminator;
 
-  root = newNode(-1, -1, -1);
+  char t1 = '$';
+  char t2 = '$';
+
+  terminator = 0;
+
+  rootEnd = (int*)malloc(sizeof(int));
+  *rootEnd = - 1;
+
+  root = newNode(-1, rootEnd);
   root->slink = root;
+
+  leafEnd = malloc(n_strings*sizeof(int));
+
+  for(k = 0; k < n_strings; k++){
+    leafEnd[k] = -1;
+  }
 
   s = malloc(sizeof(State));
 
-  while(k < n_strings){ /*For each string k*/
-    i = 0;
-    s->active_node = root;
-    s->last_newnode = NULL;
-    s->active_edge = -1;
-    s->active_length = 0;
-    s->remain = 0;
+  i = 0;
+  s->active_node = root;
+  s->last_newnode = NULL;
+  s->active_edge = -1;
+  s->active_length = 0;
+  s->remain = 0;
+  splitEnd = NULL;
 
-    while(i < strings[k]->size + 1){ /*For each char of string k*/
-      extendTree(k, i);
-      i++;
+  while(i < string->size){ /*For each char of string k*/
+
+    if(string->text[i] == t1){
+      string->text[i] = t2;
+      terminator = 1;
     }
-    k++;
+
+    extendTree(i);
+
+    if(terminator){
+      string->text[i] = t1;
+      terminator = 0;
+    }
+
+    i++;
   }
+
 }
 
 
@@ -426,11 +423,13 @@ int main(){
   count = 0;
 
   process_input();
-  buildTree();
+  print_strings();
+
+  /*buildTree();*()*/
 
   /*printTree(root);*/
-  printOccurrences(root);
-  printf("\nNumber of nodes in suffix tree are %d\n", count);
+  printf("---------------------------------------\n");
+  printf("Number of nodes in suffix tree are %d\n", count);
 
   free(s);
   free_strings();

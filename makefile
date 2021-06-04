@@ -29,7 +29,7 @@ test7:
 	./project < Tests/input07
 
 val:
-	valgrind -v --leak-check=full ./project < Tests/input07
+	valgrind -v --track-origins=yes ./project < Tests/input07
 
 vgdb:
 	valgrind --vgdb=yes --vgdb-error=0 ./project < Tests/input01
